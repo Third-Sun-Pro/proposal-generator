@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Third Sun — Proposal Generator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ocean: #1B6B7D;
+      --ocean-dark: #14525F;
+      --ocean-light: #E8F4F6;
+      --lagoon: #2AA89A;
+      --lagoon-light: #E6F7F5;
+      --sand: #F7F5F0;
+      --sand-dark: #EDE9E0;
+      --palm: #3D8B5E;
+      --palm-light: #EAF5EE;
+      --coral: #D97459;
+      --driftwood: #5C5247;
+      --shell: #FEFCF8;
+      --text: #2D3436;
+      --text-light: #7A7570;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: var(--sand); color: var(--text); min-height: 100vh; }
+
+    /* Auth */
+    .auth-overlay { position: fixed; inset: 0; background: linear-gradient(135deg, var(--ocean-dark) 0%, var(--lagoon) 100%); display: flex; align-items: center; justify-content: center; z-index: 100; }
+    .auth-box { background: var(--shell); padding: 48px; border-radius: 20px; width: 380px; text-align: center; box-shadow: 0 24px 80px rgba(0,0,0,0.25); }
+    .auth-box img { height: 40px; margin-bottom: 20px; }
+    .auth-box h1 { font-size: 22px; margin-bottom: 4px; color: var(--text); }
+    .auth-box p { color: var(--text-light); margin-bottom: 28px; font-size: 14px; }
+    .auth-box input { width: 100%; padding: 14px 16px; border: 1px solid var(--sand-dark); border-radius: 12px; font-size: 16px; margin-bottom: 16px; background: var(--sand); }
+    .auth-box input:focus { outline: none; border-color: var(--ocean); background: #fff; }
+    .auth-box button { width: 100%; padding: 14px; background: linear-gradient(135deg, var(--ocean) 0%, var(--lagoon) 100%); color: #fff; border: none; border-radius: 12px; font-size: 16px; cursor: pointer; font-weight: 600; transition: all 0.2s; }
+    .auth-box button:hover { background: linear-gradient(135deg, var(--ocean-dark) 0%, var(--ocean) 100%); }
+    .auth-error { color: var(--coral); font-size: 14px; margin-bottom: 12px; display: none; }
+
+    /* Header */
+    .header { background: linear-gradient(135deg, var(--ocean-dark) 0%, var(--ocean) 50%, var(--lagoon) 100%); color: #fff; padding: 14px 32px; display: flex; align-items: center; justify-content: space-between; }
+    .header-left { display: flex; align-items: baseline; gap: 14px; }
+    .header img { height: 24px; position: relative; top: 2px; }
+    .header h1 { font-size: 17px; font-weight: 500; letter-spacing: 0.5px; opacity: 0.9; }
+    .header-right { display: flex; align-items: center; gap: 12px; }
+    .draft-indicator { font-size: 12px; color: rgba(255,255,255,0.6); }
+    .draft-indicator.saved { color: #86EFAC; }
+    .btn-header { padding: 8px 16px; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.1); color: #fff; border-radius: 8px; font-size: 13px; cursor: pointer; font-family: 'Inter', sans-serif; font-weight: 500; transition: all 0.2s; }
+    .btn-header:hover { background: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.5); }
+
+    .container { max-width: 1100px; margin: 0 auto; padding: 32px; }
+
+    /* Steps */
+    .steps { display: flex; gap: 4px; margin-bottom: 32px; background: var(--sand-dark); border-radius: 14px; padding: 5px; }
+    .step { flex: 1; padding: 12px 16px; background: transparent; border: none; border-radius: 11px; cursor: pointer; font-size: 13px; font-weight: 500; font-family: 'Inter', sans-serif; transition: all 0.25s; display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--text-light); }
+    .step.active { background: var(--shell); box-shadow: 0 2px 8px rgba(0,0,0,0.08); font-weight: 600; color: var(--ocean); border-bottom: 2px solid var(--ocean); }
+    .step.completed { color: var(--palm); }
+    .step .check { display: none; }
+    .step.completed .check { display: inline; }
+    .step:hover:not(.active) { background: rgba(255,255,255,0.6); color: var(--text); }
+
+    .panel { display: none; animation: fadeIn 0.35s ease; }
+    .panel.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Cards */
+    .card { background: var(--shell); border-radius: 16px; padding: 28px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); border: 1px solid rgba(0,0,0,0.04); transition: box-shadow 0.2s; }
+    .card:hover { box-shadow: 0 6px 20px rgba(0,0,0,0.06); }
+    .card h2 { font-size: 17px; margin-bottom: 14px; font-weight: 700; color: var(--ocean-dark); }
+    .card h3 { font-size: 15px; margin-bottom: 12px; font-weight: 600; color: var(--driftwood); }
+
+    /* Form elements */
+    label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 6px; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.8px; }
+    input[type="text"], input[type="number"], select, textarea {
+      width: 100%; padding: 12px 14px; border: 1px solid var(--sand-dark); border-radius: 10px;
+      font-size: 14px; font-family: 'Inter', sans-serif; transition: all 0.2s; background: var(--sand);
+    }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: var(--ocean); background: #fff; box-shadow: 0 0 0 3px rgba(27,107,125,0.1); }
+    textarea { resize: vertical; min-height: 120px; }
+
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+    .form-group { margin-bottom: 16px; }
+
+    /* Buttons */
+    .btn { padding: 12px 24px; border: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif; transition: all 0.2s; }
+    .btn-primary { background: linear-gradient(135deg, var(--ocean) 0%, var(--lagoon) 100%); color: #fff; }
+    .btn-primary:hover { background: linear-gradient(135deg, var(--ocean-dark) 0%, var(--ocean) 100%); transform: translateY(-1px); box-shadow: 0 6px 16px rgba(27,107,125,0.3); }
+    .btn-primary:active { transform: translateY(0); }
+    .btn-primary:disabled { background: #B0BEC5; cursor: not-allowed; transform: none; box-shadow: none; }
+    .btn-secondary { background: var(--sand-dark); color: var(--text); }
+    .btn-secondary:hover { background: #DDD8CE; }
+    .btn-copy { background: var(--ocean-light); color: var(--ocean); padding: 8px 16px; font-size: 12px; border-radius: 8px; font-weight: 600; }
+    .btn-copy:hover { background: #D0ECEF; }
+    .btn-copy.copied { background: var(--palm); color: #fff; }
+
+    /* Upload area */
+    .upload-zone {
+      border: 2px dashed var(--sand-dark); border-radius: 16px; padding: 48px; text-align: center;
+      cursor: pointer; transition: all 0.2s; margin-bottom: 16px; background: var(--sand);
+    }
+    .upload-zone:hover, .upload-zone.dragover { border-color: var(--lagoon); background: var(--lagoon-light); }
+    .upload-zone p { color: var(--text-light); font-size: 14px; }
+    .upload-zone .icon { font-size: 36px; margin-bottom: 12px; }
+    .file-list { list-style: none; }
+    .file-list li { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--sand); border-radius: 8px; margin-bottom: 6px; font-size: 14px; }
+    .file-list li button { background: none; border: none; color: var(--coral); cursor: pointer; font-size: 16px; padding: 4px 8px; border-radius: 4px; }
+    .file-list li button:hover { background: #FDE8E8; }
+
+    /* Pricing */
+    .pricing-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .pricing-item { display: flex; align-items: center; gap: 12px; padding: 18px; background: var(--sand); border-radius: 12px; border: 1px solid transparent; transition: all 0.2s; }
+    .pricing-item:has(input:checked) { background: var(--lagoon-light); border-color: var(--lagoon); }
+    .pricing-item input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--lagoon); }
+    .pricing-item label { margin: 0; flex: 1; }
+    .pricing-item .price { font-weight: 700; white-space: nowrap; font-size: 15px; color: var(--ocean-dark); }
+    .hours-input { width: 70px !important; display: inline-block; padding: 6px 8px !important; }
+
+    .pricing-total-bar { position: sticky; bottom: 0; background: var(--shell); border-top: 2px solid var(--sand-dark); padding: 20px 28px; margin: -28px; margin-top: 20px; border-radius: 0 0 16px 16px; display: flex; align-items: center; justify-content: space-between; }
+    .pricing-total-bar .total { font-size: 32px; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, var(--ocean-dark), var(--lagoon)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .pricing-total-bar .deposit { font-size: 14px; color: var(--text-light); }
+    .pricing-total-bar .label { font-size: 12px; font-weight: 600; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.5px; }
+
+    .custom-total-row { display: flex; align-items: center; gap: 12px; margin-top: 16px; padding: 14px 18px; background: #FFF8EC; border-radius: 10px; border: 1px solid #F0DEB4; }
+    .custom-total-row input[type="number"] { width: 140px !important; }
+
+    /* Collapsible sections */
+    .section-card { background: var(--shell); border-radius: 16px; margin-bottom: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); border: 1px solid rgba(0,0,0,0.04); overflow: hidden; transition: all 0.2s; }
+    .section-card:hover { box-shadow: 0 6px 20px rgba(0,0,0,0.06); }
+    .section-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 24px; cursor: pointer; user-select: none; }
+    .section-header h2 { font-size: 15px; font-weight: 700; margin: 0; display: flex; align-items: center; gap: 10px; background: linear-gradient(135deg, var(--ocean-dark), var(--lagoon)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .section-header .toggle { font-size: 16px; color: var(--text-light); transition: transform 0.2s; }
+    .section-card.collapsed .toggle { transform: rotate(-90deg); }
+    .section-card.collapsed .section-body { display: none; }
+    .section-header-actions { display: flex; align-items: center; gap: 8px; }
+    .section-body { padding: 0 24px 20px; }
+    .word-count { font-size: 11px; color: var(--text-light); margin-top: 6px; text-align: right; }
+
+    .editable { width: 100%; min-height: 80px; padding: 14px; border: 1px solid var(--sand-dark); border-radius: 10px; font-family: 'Inter', sans-serif; font-size: 14px; line-height: 1.7; white-space: pre-wrap; background: var(--sand); transition: all 0.2s; }
+    .editable:focus { outline: none; border-color: var(--ocean); background: #fff; box-shadow: 0 0 0 3px rgba(27,107,125,0.1); }
+
+    /* Status */
+    .status { padding: 14px 18px; border-radius: 12px; margin-bottom: 16px; font-size: 14px; display: none; font-weight: 500; }
+    .status.loading { display: flex; align-items: center; gap: 10px; background: var(--ocean-light); color: var(--ocean-dark); }
+    .status.error { display: block; background: #FEF2F2; color: #991B1B; }
+    .status.success { display: flex; align-items: center; gap: 10px; background: var(--palm-light); color: #1B5E3B; }
+    .spinner { width: 18px; height: 18px; border: 2px solid rgba(27,107,125,0.3); border-top-color: var(--ocean); border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Copy all panel */
+    .copy-all-section { background: linear-gradient(135deg, var(--ocean-dark), var(--lagoon)); border-radius: 16px; padding: 36px; margin-top: 24px; text-align: center; }
+    .copy-all-section h3 { margin-bottom: 8px; color: #fff; font-size: 18px; }
+    .copy-all-section p { color: rgba(255,255,255,0.7); margin-bottom: 20px; font-size: 14px; }
+    .copy-all-btn { width: 100%; padding: 16px; font-size: 16px; background: #fff !important; color: var(--ocean-dark) !important; border-radius: 12px; }
+    .copy-all-btn:hover { background: var(--sand) !important; transform: translateY(-1px); }
+    .copy-all-btn.copied { background: var(--palm) !important; color: #fff !important; }
+
+    /* Drafts panel */
+    .drafts-panel { position: fixed; top: 0; right: -420px; width: 420px; height: 100vh; background: var(--shell); box-shadow: -8px 0 30px rgba(0,0,0,0.1); z-index: 50; transition: right 0.3s ease; padding: 28px; overflow-y: auto; }
+    .drafts-panel.open { right: 0; }
+    .drafts-panel h2 { font-size: 18px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; color: var(--ocean-dark); }
+    .drafts-panel .close-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-light); padding: 4px 8px; }
+    .draft-item { padding: 16px; border: 1px solid var(--sand-dark); border-radius: 12px; margin-bottom: 10px; cursor: pointer; transition: all 0.2s; background: var(--sand); }
+    .draft-item:hover { border-color: var(--ocean); background: var(--ocean-light); }
+    .draft-item h3 { font-size: 14px; font-weight: 600; margin-bottom: 4px; color: var(--text); }
+    .draft-item p { font-size: 12px; color: var(--text-light); }
+    .draft-item .draft-actions { display: flex; gap: 8px; margin-top: 8px; }
+    .draft-item .draft-actions button { font-size: 12px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--sand-dark); background: var(--shell); cursor: pointer; font-family: 'Inter', sans-serif; }
+    .draft-item .draft-actions button:hover { background: #fff; }
+    .draft-item .draft-actions button.delete { color: var(--coral); border-color: #FECACA; }
+    .draft-item .draft-actions button.delete:hover { background: #FEF2F2; }
+    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.2); z-index: 49; display: none; backdrop-filter: blur(2px); }
+    .overlay.open { display: block; }
+
+    /* Project picker */
+    .project-option { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; cursor: pointer; transition: background 0.15s; font-size: 14px; }
+    .project-option:hover { background: var(--ocean-light); }
+    .project-option input { accent-color: var(--ocean); width: 16px; height: 16px; }
+    .project-option.checked { background: var(--lagoon-light); }
+    .project-option .sector-tag { font-size: 11px; color: var(--text-light); margin-left: auto; }
+
+    @media (max-width: 768px) {
+      .form-row, .pricing-grid { grid-template-columns: 1fr; }
+      .container { padding: 16px; }
+      .steps { flex-wrap: wrap; }
+      .drafts-panel { width: 100%; right: -100%; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Auth -->
+<div class="auth-overlay" id="authOverlay">
+  <div class="auth-box">
+    <img src="https://thirdsun.com/images/admin/thirdsun-white.png" alt="Third Sun" onerror="this.style.display='none'" style="filter:invert(1);height:40px;">
+    <h1>Proposal Generator</h1>
+    <p>Sign in to create proposals</p>
+    <div class="auth-error" id="authError">Incorrect password</div>
+    <input type="password" id="authPassword" placeholder="Enter password" onkeydown="if(event.key==='Enter')login()">
+    <button onclick="login()">Sign In</button>
+  </div>
+</div>
+
+<!-- Drafts Slide Panel -->
+<div class="overlay" id="draftsOverlay" onclick="toggleDrafts()"></div>
+<div class="drafts-panel" id="draftsPanel">
+  <h2>Saved Drafts <button class="close-btn" onclick="toggleDrafts()">×</button></h2>
+  <div id="draftsList"></div>
+</div>
+
+<!-- App -->
+<div class="header">
+  <div class="header-left">
+    <img src="https://thirdsun.com/images/admin/thirdsun-white.png" alt="Third Sun" onerror="this.style.display='none'">
+    <h1>Proposal Generator</h1>
+  </div>
+  <div class="header-right">
+    <span class="draft-indicator" id="draftIndicator"></span>
+    <button class="btn-header" onclick="saveDraft()">Save Draft</button>
+    <button class="btn-header" onclick="toggleDrafts()">Drafts</button>
+  </div>
+</div>
+
+<div class="container">
+  <!-- Step Tabs -->
+  <div class="steps">
+    <button class="step active" data-step="1" onclick="goToStep(1)"><span class="check">✓ </span>1. Input</button>
+    <button class="step" data-step="2" onclick="goToStep(2)"><span class="check">✓ </span>2. Client Info</button>
+    <button class="step" data-step="3" onclick="goToStep(3)"><span class="check">✓ </span>3. Pricing</button>
+    <button class="step" data-step="4" onclick="goToStep(4)"><span class="check">✓ </span>4. Generate & Edit</button>
+  </div>
+
+  <!-- Step 1: Input -->
+  <div class="panel active" id="step1">
+    <div class="card">
+      <h2>Upload Documents</h2>
+      <p style="color: #666; font-size: 14px; margin-bottom: 16px;">Upload Zoom transcripts, meeting notes, client emails, or any relevant docs.</p>
+      <div class="upload-zone" id="uploadZone"
+           ondragover="event.preventDefault(); this.classList.add('dragover')"
+           ondragleave="this.classList.remove('dragover')"
+           ondrop="handleDrop(event)"
+           onclick="document.getElementById('fileInput').click()">
+        <div class="icon">📄</div>
+        <p>Drag & drop files here, or click to browse</p>
+        <p style="font-size: 12px; color: #999; margin-top: 4px;">PDF, TXT, DOC supported</p>
+      </div>
+      <input type="file" id="fileInput" multiple accept=".pdf,.txt,.doc,.docx" style="display:none" onchange="handleFiles(this.files)">
+      <ul class="file-list" id="fileList"></ul>
+    </div>
+
+    <div class="card">
+      <h2>Paste Notes</h2>
+      <p style="color: #666; font-size: 14px; margin-bottom: 16px;">Paste Zoom transcript, Evernote notes, call notes, or any other relevant info.</p>
+      <textarea id="pastedNotes" rows="10" placeholder="Paste your transcript, meeting notes, or any relevant info here..."></textarea>
+    </div>
+
+    <div class="card">
+      <h2>Additional Context</h2>
+      <p style="color: #666; font-size: 14px; margin-bottom: 16px;">Anything else the AI should know when drafting (optional).</p>
+      <textarea id="additionalNotes" rows="4" placeholder="e.g. They want drone video, they're a startup with no existing brand, budget is tight..."></textarea>
+    </div>
+
+    <div style="display: flex; gap: 12px;">
+      <button class="btn btn-primary" id="extractBtn" onclick="extractAndContinue()">Extract Client Info & Continue →</button>
+    </div>
+  </div>
+
+  <!-- Step 2: Client Info -->
+  <div class="panel" id="step2">
+    <div class="card">
+      <div id="extractStatus" class="status"></div>
+      <h2>Client Information</h2>
+      <p style="color: #666; font-size: 14px; margin-bottom: 16px;">Auto-filled from your input. Review and adjust as needed.</p>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Client / Organization Name</label>
+          <input type="text" id="clientName" placeholder="e.g. Corner Partners">
+        </div>
+        <div class="form-group">
+          <label>Contact Name</label>
+          <input type="text" id="contactName" placeholder="e.g. Bill Gaskill">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Sector</label>
+          <select id="sector">
+            <option value="nonprofit">Nonprofit</option>
+            <option value="small-business">Small Business</option>
+            <option value="education">Education</option>
+            <option value="government">Government</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Industry / Keywords</label>
+          <input type="text" id="keywords" placeholder="e.g. arts, environment, food">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Project Type</label>
+        <select id="projectType">
+          <option value="web-design">Web Design</option>
+          <option value="branding-web">Branding + Web Design</option>
+          <option value="branding">Branding Only</option>
+          <option value="redesign">Website Redesign</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin-top:8px;">
+        <label>Similar Projects <span style="text-transform:none;font-weight:400;letter-spacing:0">(select projects to reference in the proposal)</span></label>
+        <input type="text" id="projectSearch" placeholder="Search projects..." oninput="filterProjects()" style="margin-bottom:10px;">
+        <div id="projectPicker" style="max-height:200px;overflow-y:auto;border:1px solid var(--sand-dark);border-radius:10px;padding:8px;background:var(--sand);"></div>
+        <div id="selectedCount" style="font-size:12px;color:var(--text-light);margin-top:6px;">0 selected</div>
+      </div>
+
+      <div style="display: flex; gap: 12px;">
+        <button class="btn btn-secondary" onclick="goToStep(1)">← Back</button>
+        <button class="btn btn-primary" onclick="goToStep(3)">Next →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 3: Pricing -->
+  <div class="panel" id="step3">
+    <div class="card" style="position:relative;">
+      <h2>Pricing Calculator</h2>
+      <div class="pricing-grid">
+        <div class="pricing-item">
+          <input type="checkbox" id="priceBranding" onchange="updatePricing()">
+          <label for="priceBranding">Brand & Identity Package<br><span style="font-size:12px;color:#666">30 hours</span></label>
+          <span class="price">$4,500</span>
+        </div>
+        <div class="pricing-item">
+          <input type="checkbox" id="priceWeb" checked onchange="updatePricing()">
+          <label for="priceWeb">Web Design & Development<br>
+            <span style="font-size:12px;color:#666">
+              <input type="number" class="hours-input" id="webHours" value="50" min="50" max="100" onchange="updatePricing()"> hours
+            </span>
+          </label>
+          <span class="price" id="webPrice">$7,500</span>
+        </div>
+        <div class="pricing-item">
+          <input type="checkbox" id="priceHosting" checked onchange="updatePricing()">
+          <label for="priceHosting">Annual Hosting<br><span style="font-size:12px;color:#666">managed hosting</span></label>
+          <span class="price">$450</span>
+        </div>
+        <div class="pricing-item">
+          <input type="checkbox" id="priceSupport" checked onchange="updatePricing()">
+          <label for="priceSupport">Annual Support<br>
+            <span style="font-size:12px;color:#666">
+              <select id="supportTier" onchange="updatePricing()" style="width:auto;display:inline;padding:4px 8px;">
+                <option value="basic">Basic — $1,200</option>
+                <option value="premium">Premium — $1,500</option>
+              </select>
+            </span>
+          </label>
+          <span class="price" id="supportPrice">$1,200</span>
+        </div>
+      </div>
+
+      <div class="custom-total-row">
+        <input type="checkbox" id="useCustomTotal" onchange="updatePricing()">
+        <label for="useCustomTotal" style="margin:0;text-transform:none;letter-spacing:0">Override total:</label>
+        <span>$</span>
+        <input type="number" id="customTotal" placeholder="e.g. 12000" onchange="updatePricing()">
+        <span style="font-size:12px;color:#666">(for case-by-case pricing)</span>
+      </div>
+
+      <div class="pricing-total-bar">
+        <div>
+          <div class="label">Estimated Total</div>
+          <div class="total">$<span id="totalPrice">9,150</span></div>
+        </div>
+        <div style="text-align:right;">
+          <div class="label">50% Deposit</div>
+          <div class="deposit">$<span id="depositAmount">4,575</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display: flex; gap: 12px; margin-top: 24px;">
+      <button class="btn btn-secondary" onclick="goToStep(2)">← Back</button>
+      <button class="btn btn-primary" id="generateBtn" onclick="generate()">Generate Proposal Content →</button>
+    </div>
+  </div>
+
+  <!-- Step 4: Generate & Edit -->
+  <div class="panel" id="step4">
+    <div id="statusMsg" class="status"></div>
+
+    <div id="generatedContent" style="display:none;">
+
+      <div class="section-card" id="card-exec">
+        <div class="section-header" onclick="toggleSection('card-exec')">
+          <h2><span class="toggle">▼</span> Executive Summary</h2>
+          <div class="section-header-actions" onclick="event.stopPropagation()">
+            <button class="btn btn-copy" onclick="copySection('execSummary', this)">Copy</button>
+          </div>
+        </div>
+        <div class="section-body">
+          <div class="editable" contenteditable="true" id="execSummary" oninput="updateWordCount(this, 'wc-exec')"></div>
+          <div class="word-count" id="wc-exec"></div>
+        </div>
+      </div>
+
+      <div class="section-card" id="card-goals">
+        <div class="section-header" onclick="toggleSection('card-goals')">
+          <h2><span class="toggle">▼</span> Project Goals</h2>
+          <div class="section-header-actions" onclick="event.stopPropagation()">
+            <button class="btn btn-copy" onclick="copySection('projGoals', this)">Copy</button>
+          </div>
+        </div>
+        <div class="section-body">
+          <div class="editable" contenteditable="true" id="projGoals" oninput="updateWordCount(this, 'wc-goals')"></div>
+          <div class="word-count" id="wc-goals"></div>
+        </div>
+      </div>
+
+      <div class="section-card" id="card-scope">
+        <div class="section-header" onclick="toggleSection('card-scope')">
+          <h2><span class="toggle">▼</span> Scope of Services</h2>
+          <div class="section-header-actions" onclick="event.stopPropagation()">
+            <button class="btn btn-copy" onclick="copySection('scopeContent', this)">Copy</button>
+          </div>
+        </div>
+        <div class="section-body">
+          <div class="editable" contenteditable="true" id="scopeContent" style="min-height:200px;" oninput="updateWordCount(this, 'wc-scope')"></div>
+          <div class="word-count" id="wc-scope"></div>
+        </div>
+      </div>
+
+      <div class="section-card" id="card-timeline">
+        <div class="section-header" onclick="toggleSection('card-timeline')">
+          <h2><span class="toggle">▼</span> Timeline</h2>
+          <div class="section-header-actions" onclick="event.stopPropagation()">
+            <button class="btn btn-copy" onclick="copySection('timelineContent', this)">Copy</button>
+          </div>
+        </div>
+        <div class="section-body">
+          <div class="editable" contenteditable="true" id="timelineContent" oninput="updateWordCount(this, 'wc-timeline')"></div>
+          <div class="word-count" id="wc-timeline"></div>
+        </div>
+      </div>
+
+      <div class="section-card" id="card-pricing">
+        <div class="section-header" onclick="toggleSection('card-pricing')">
+          <h2><span class="toggle">▼</span> Pricing Summary</h2>
+          <div class="section-header-actions" onclick="event.stopPropagation()">
+            <button class="btn btn-copy" onclick="copySection('pricingSummary', this)">Copy</button>
+          </div>
+        </div>
+        <div class="section-body">
+          <div class="editable" contenteditable="true" id="pricingSummary" oninput="updateWordCount(this, 'wc-pricing')"></div>
+          <div class="word-count" id="wc-pricing"></div>
+        </div>
+      </div>
+
+      <div class="section-card" id="card-next">
+        <div class="section-header" onclick="toggleSection('card-next')">
+          <h2><span class="toggle">▼</span> Next Steps</h2>
+          <div class="section-header-actions" onclick="event.stopPropagation()">
+            <button class="btn btn-copy" onclick="copySection('nextStepsContent', this)">Copy</button>
+          </div>
+        </div>
+        <div class="section-body">
+          <div class="editable" contenteditable="true" id="nextStepsContent" oninput="updateWordCount(this, 'wc-next')"></div>
+          <div class="word-count" id="wc-next"></div>
+        </div>
+      </div>
+
+      <div class="section-card" id="card-similar">
+        <div class="section-header" onclick="toggleSection('card-similar')">
+          <h2><span class="toggle">▼</span> Similar Projects</h2>
+          <div class="section-header-actions" onclick="event.stopPropagation()">
+            <button class="btn btn-copy" onclick="copySection('similarProjects', this)">Copy</button>
+          </div>
+        </div>
+        <div class="section-body">
+          <p style="font-size:13px;color:#666;margin-bottom:10px;">Matching projects from the Third Sun portfolio.</p>
+          <div id="similarProjects" class="editable" contenteditable="true"></div>
+        </div>
+      </div>
+
+      <!-- Copy All -->
+      <div class="copy-all-section">
+        <h3>Ready to paste into Proposify?</h3>
+        <p>All sections will be copied with headers included.</p>
+        <button class="btn copy-all-btn" onclick="copyAll()">Copy All Sections</button>
+      </div>
+    </div>
+
+    <div style="display: flex; gap: 12px; margin-top: 24px;">
+      <button class="btn btn-secondary" onclick="goToStep(3)">← Back to Pricing</button>
+      <button class="btn btn-primary" onclick="generate()" id="regenerateBtn" style="display:none;">Regenerate</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Auth
+  async function checkAuth() {
+    const res = await fetch('/check-auth');
+    const data = await res.json();
+    if (data.authenticated) document.getElementById('authOverlay').style.display = 'none';
+  }
+  async function login() {
+    const pw = document.getElementById('authPassword').value;
+    const res = await fetch('/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pw }) });
+    if (res.ok) {
+      document.getElementById('authOverlay').style.display = 'none';
+    } else {
+      document.getElementById('authError').style.display = 'block';
+    }
+  }
+  checkAuth();
+
+  // Steps
+  let currentStep = 1;
+  function goToStep(n) {
+    document.querySelectorAll('.step').forEach(s => {
+      const sn = parseInt(s.dataset.step);
+      if (sn < n) s.classList.add('completed');
+      s.classList.toggle('active', sn === n);
+    });
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('step' + n).classList.add('active');
+    currentStep = n;
+    window.scrollTo(0, 0);
+  }
+
+  // File upload
+  let uploadedFiles = [];
+  function handleDrop(e) {
+    e.preventDefault();
+    e.currentTarget.classList.remove('dragover');
+    handleFiles(e.dataTransfer.files);
+  }
+  function handleFiles(files) {
+    for (const f of files) uploadedFiles.push(f);
+    renderFileList();
+  }
+  function removeFile(idx) {
+    uploadedFiles.splice(idx, 1);
+    renderFileList();
+  }
+  function renderFileList() {
+    const ul = document.getElementById('fileList');
+    ul.innerHTML = uploadedFiles.map((f, i) =>
+      `<li>${f.name} <span style="color:#999;font-size:12px">(${(f.size/1024).toFixed(0)} KB)</span> <button onclick="removeFile(${i})">✕</button></li>`
+    ).join('');
+  }
+
+  // Extract client info
+  async function extractAndContinue() {
+    const btn = document.getElementById('extractBtn');
+    const notes = document.getElementById('pastedNotes').value;
+    const additional = document.getElementById('additionalNotes').value;
+    const hasFiles = uploadedFiles.length > 0;
+
+    if (!notes && !hasFiles && !additional) {
+      alert('Please paste some notes or upload files first.');
+      return;
+    }
+    if (!notes && !hasFiles) { goToStep(2); return; }
+
+    btn.disabled = true;
+    btn.textContent = 'Extracting client info...';
+
+    try {
+      const formData = new FormData();
+      formData.append('transcript', notes);
+      for (const f of uploadedFiles) formData.append('files', f);
+
+      const res = await fetch('/extract-client-info', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      if (data.clientName) document.getElementById('clientName').value = data.clientName;
+      if (data.contactName) document.getElementById('contactName').value = data.contactName;
+      if (data.sector) document.getElementById('sector').value = data.sector;
+      if (data.keywords) document.getElementById('keywords').value = data.keywords;
+      if (data.projectType) document.getElementById('projectType').value = data.projectType;
+
+      if (data.projectType === 'branding-web' || data.projectType === 'branding') {
+        document.getElementById('priceBranding').checked = true;
+        updatePricing();
+      }
+
+      const status = document.getElementById('extractStatus');
+      status.className = 'status success';
+      status.innerHTML = '<span>✓</span> Client info extracted — review and adjust below.' + (data.notes ? ' <em>' + data.notes + '</em>' : '');
+      goToStep(2);
+    } catch (err) {
+      alert('Error extracting: ' + err.message + '. You can fill in the fields manually.');
+      goToStep(2);
+    }
+    btn.disabled = false;
+    btn.textContent = 'Extract Client Info & Continue →';
+  }
+
+  // Project picker
+  let allProjects = [];
+  let selectedProjects = new Set();
+
+  async function loadProjects() {
+    try {
+      const res = await fetch('/portfolio');
+      allProjects = await res.json();
+      renderProjectPicker();
+    } catch (e) { console.error('Failed to load portfolio', e); }
+  }
+
+  function renderProjectPicker(filter = '') {
+    const container = document.getElementById('projectPicker');
+    const lowerFilter = filter.toLowerCase();
+    const filtered = allProjects.filter(p =>
+      !lowerFilter || p.name.toLowerCase().includes(lowerFilter) || p.sector.includes(lowerFilter)
+    );
+    const sectorLabel = s => s === 'nonprofit' ? 'Nonprofit' : s === 'small-business' ? 'Small Business' : s === 'education' ? 'Education' : 'Government';
+
+    container.innerHTML = filtered.map(p => {
+      const checked = selectedProjects.has(p.name);
+      return `<label class="project-option${checked ? ' checked' : ''}" onclick="event.stopPropagation()">
+        <input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleProject('${p.name.replace(/'/g, "\\'")}', this)">
+        ${p.name}
+        <span class="sector-tag">${sectorLabel(p.sector)}</span>
+      </label>`;
+    }).join('');
+
+    document.getElementById('selectedCount').textContent = `${selectedProjects.size} selected`;
+  }
+
+  function toggleProject(name, checkbox) {
+    if (checkbox.checked) {
+      selectedProjects.add(name);
+    } else {
+      selectedProjects.delete(name);
+    }
+    checkbox.closest('.project-option').classList.toggle('checked', checkbox.checked);
+    document.getElementById('selectedCount').textContent = `${selectedProjects.size} selected`;
+  }
+
+  function filterProjects() {
+    const val = document.getElementById('projectSearch').value;
+    renderProjectPicker(val);
+  }
+
+  function getSelectedProjectsHTML() {
+    if (!selectedProjects.size) return 'No similar projects selected.';
+    const slug = name => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+$/, '');
+    const project = name => allProjects.find(p => p.name === name);
+    const sectorLabel = s => s === 'nonprofit' ? 'Nonprofit' : s === 'small-business' ? 'Small Business' : s === 'education' ? 'Education' : 'Government';
+    return [...selectedProjects].map(name => {
+      const p = project(name);
+      const sector = p ? sectorLabel(p.sector) : '';
+      return `• <a href="https://thirdsun.com/work#${slug(name)}" target="_blank" style="color:var(--ocean);">${name}</a>${sector ? ' — ' + sector : ''}`;
+    }).join('<br>');
+  }
+
+  // Load projects on auth
+  loadProjects();
+
+  // Pricing
+  function updatePricing() {
+    const branding = document.getElementById('priceBranding').checked;
+    const web = document.getElementById('priceWeb').checked;
+    const hours = parseInt(document.getElementById('webHours').value) || 50;
+    const hosting = document.getElementById('priceHosting').checked;
+    const support = document.getElementById('priceSupport').checked;
+    const tier = document.getElementById('supportTier').value;
+    const useCustom = document.getElementById('useCustomTotal').checked;
+    const customVal = parseInt(document.getElementById('customTotal').value) || 0;
+
+    const combo = branding && web;
+    let total = 0;
+    if (branding) total += combo ? 4000 : 4500;
+    if (web) { total += hours * 150; document.getElementById('webPrice').textContent = '$' + (hours * 150).toLocaleString(); }
+    if (hosting) total += 450;
+    if (support) {
+      const sp = tier === 'premium' ? 1500 : 1200;
+      total += sp;
+      document.getElementById('supportPrice').textContent = '$' + sp.toLocaleString();
+    }
+    if (useCustom && customVal > 0) total = customVal;
+
+    document.getElementById('totalPrice').textContent = total.toLocaleString();
+    document.getElementById('depositAmount').textContent = (total * 0.5).toLocaleString();
+  }
+  updatePricing();
+
+  document.getElementById('projectType').addEventListener('change', function() {
+    const b = document.getElementById('priceBranding');
+    b.checked = this.value === 'branding-web' || this.value === 'branding';
+    updatePricing();
+  });
+
+  // Generate
+  async function generate() {
+    const btn = document.getElementById('generateBtn');
+    const status = document.getElementById('statusMsg');
+    btn.disabled = true;
+    btn.textContent = 'Generating...';
+    status.className = 'status loading';
+    status.innerHTML = '<div class="spinner"></div> Generating proposal content — this may take 15-30 seconds...';
+    document.getElementById('generatedContent').style.display = 'none';
+    goToStep(4);
+
+    const formData = new FormData();
+    formData.append('clientName', document.getElementById('clientName').value);
+    formData.append('sector', document.getElementById('sector').value);
+    formData.append('transcript', document.getElementById('pastedNotes').value);
+    formData.append('notes', document.getElementById('additionalNotes').value);
+    for (const f of uploadedFiles) formData.append('files', f);
+
+    try {
+      const res = await fetch('/generate', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      document.getElementById('execSummary').textContent = data.sections.executiveSummary;
+      document.getElementById('projGoals').textContent = data.sections.projectGoals;
+      document.getElementById('scopeContent').textContent = data.sections.scope;
+      document.getElementById('timelineContent').textContent = buildTimelineText(data.sections.timeline);
+      document.getElementById('nextStepsContent').textContent = data.sections.nextSteps || 'To proceed, please sign the agreement below and submit the 50% deposit. Upon receipt, Third Sun will schedule a kick-off meeting to begin the project.';
+      document.getElementById('pricingSummary').textContent = buildPricingText();
+
+      // Use manually selected projects
+      document.getElementById('similarProjects').innerHTML = getSelectedProjectsHTML();
+
+      // Update word counts
+      document.querySelectorAll('.editable[oninput]').forEach(el => {
+        const wcId = el.getAttribute('oninput').match(/'([^']+)'/)?.[1];
+        if (wcId) updateWordCount(el, wcId);
+      });
+
+      status.className = 'status success';
+      status.innerHTML = '<span>✓</span> Content generated! Edit any section below, then copy to Proposify.';
+      document.getElementById('generatedContent').style.display = 'block';
+      document.getElementById('regenerateBtn').style.display = 'inline-block';
+    } catch (err) {
+      status.className = 'status error';
+      status.textContent = 'Error: ' + err.message;
+    }
+    btn.disabled = false;
+    btn.textContent = 'Generate Proposal Content →';
+  }
+
+  function buildTimelineText(timeline) {
+    const clientName = document.getElementById('clientName').value || 'the client';
+    const clean = timeline.replace(/\.\s*$/, '');
+    return `A typical project of this scope usually takes ${clean} and is contingent upon ${clientName}'s delivery of requested pieces (approval of creative brief and site plan, feedback, photos, final content) and timely feedback.\n\nA more firm timeline will be determined after signing the contract below.`;
+  }
+
+  function buildPricingText() {
+    const branding = document.getElementById('priceBranding').checked;
+    const web = document.getElementById('priceWeb').checked;
+    const hours = parseInt(document.getElementById('webHours').value) || 50;
+    const hosting = document.getElementById('priceHosting').checked;
+    const support = document.getElementById('priceSupport').checked;
+    const tier = document.getElementById('supportTier').value;
+    const total = document.getElementById('totalPrice').textContent;
+    const deposit = document.getElementById('depositAmount').textContent;
+    const clientName = document.getElementById('clientName').value || 'Client';
+    const combo = branding && web;
+
+    let lines = [`Third Sun Productions estimates that the cost for producing the deliverables outlined in this proposal will be $${total}.`];
+    lines.push('');
+    if (branding) lines.push(`• Brand & Identity Package: $${combo ? '4,000' : '4,500'}`);
+    if (web) lines.push(`• Web Design & Development (${hours} hours): $${(hours * 150).toLocaleString()}`);
+    if (hosting) lines.push('• Annual Hosting: $450');
+    if (support) lines.push(`• Annual Support Agreement (${tier}): $${tier === 'premium' ? '1,500' : '1,200'}`);
+    lines.push('');
+    lines.push(`Payment to Third Sun Productions shall be made by ${clientName} as follows:`);
+    lines.push(`• A deposit of 50% ($${deposit}) is due upon signing this Agreement before work begins.`);
+    lines.push('• A final payment (adjusted for changes if necessary) is due upon completion of work.');
+    lines.push('• If payment is not received within 30 days, 10% late fee will accrue monthly on balance.');
+    return lines.join('\n');
+  }
+
+  // Collapsible sections
+  function toggleSection(cardId) {
+    document.getElementById(cardId).classList.toggle('collapsed');
+  }
+
+  // Word count
+  function updateWordCount(el, wcId) {
+    const text = (el.innerText || el.textContent || '').trim();
+    const words = text ? text.split(/\s+/).length : 0;
+    document.getElementById(wcId).textContent = `${words} word${words !== 1 ? 's' : ''}`;
+  }
+
+  // Copy
+  function copySection(id, btn) {
+    const el = document.getElementById(id);
+    const text = el.innerText || el.textContent;
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+    });
+  }
+
+  function copyAll() {
+    const sections = [
+      'EXECUTIVE SUMMARY\n' + document.getElementById('execSummary').innerText,
+      'PROJECT GOALS\n' + document.getElementById('projGoals').innerText,
+      'SCOPE OF SERVICES\n' + document.getElementById('scopeContent').innerText,
+      'TIMELINE\n' + document.getElementById('timelineContent').innerText,
+      'ESTIMATE & PAYMENT AGREEMENTS\n' + document.getElementById('pricingSummary').innerText,
+      'NEXT STEPS\n' + document.getElementById('nextStepsContent').innerText,
+      'SIMILAR PROJECTS\n' + document.getElementById('similarProjects').innerText,
+    ];
+    navigator.clipboard.writeText(sections.join('\n\n---\n\n')).then(() => {
+      const btn = document.querySelector('.copy-all-btn');
+      btn.textContent = 'Copied All Sections!';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = 'Copy All Sections'; btn.classList.remove('copied'); }, 2000);
+    });
+  }
+
+  // Save/Load Drafts (localStorage)
+  function getDrafts() {
+    return JSON.parse(localStorage.getItem('proposal-drafts') || '[]');
+  }
+
+  function saveDraft() {
+    const clientName = document.getElementById('clientName').value || 'Untitled';
+    const drafts = getDrafts();
+    const draft = {
+      id: Date.now(),
+      clientName,
+      contactName: document.getElementById('contactName').value,
+      sector: document.getElementById('sector').value,
+      keywords: document.getElementById('keywords').value,
+      projectType: document.getElementById('projectType').value,
+      pastedNotes: document.getElementById('pastedNotes').value,
+      additionalNotes: document.getElementById('additionalNotes').value,
+      priceBranding: document.getElementById('priceBranding').checked,
+      priceWeb: document.getElementById('priceWeb').checked,
+      webHours: document.getElementById('webHours').value,
+      priceHosting: document.getElementById('priceHosting').checked,
+      priceSupport: document.getElementById('priceSupport').checked,
+      supportTier: document.getElementById('supportTier').value,
+      useCustomTotal: document.getElementById('useCustomTotal').checked,
+      customTotal: document.getElementById('customTotal').value,
+      execSummary: document.getElementById('execSummary').innerText,
+      projGoals: document.getElementById('projGoals').innerText,
+      scopeContent: document.getElementById('scopeContent').innerText,
+      timelineContent: document.getElementById('timelineContent').innerText,
+      pricingSummary: document.getElementById('pricingSummary').innerText,
+      nextStepsContent: document.getElementById('nextStepsContent').innerText,
+      similarProjects: document.getElementById('similarProjects').innerHTML,
+      savedAt: new Date().toISOString(),
+    };
+
+    // Update existing or add new
+    const existing = drafts.findIndex(d => d.clientName === clientName);
+    if (existing >= 0) drafts[existing] = draft;
+    else drafts.unshift(draft);
+
+    localStorage.setItem('proposal-drafts', JSON.stringify(drafts));
+
+    const indicator = document.getElementById('draftIndicator');
+    indicator.textContent = 'Draft saved';
+    indicator.classList.add('saved');
+    setTimeout(() => { indicator.textContent = ''; indicator.classList.remove('saved'); }, 2000);
+  }
+
+  function loadDraft(id) {
+    const drafts = getDrafts();
+    const d = drafts.find(d => d.id === id);
+    if (!d) return;
+
+    document.getElementById('clientName').value = d.clientName || '';
+    document.getElementById('contactName').value = d.contactName || '';
+    document.getElementById('sector').value = d.sector || 'nonprofit';
+    document.getElementById('keywords').value = d.keywords || '';
+    document.getElementById('projectType').value = d.projectType || 'web-design';
+    document.getElementById('pastedNotes').value = d.pastedNotes || '';
+    document.getElementById('additionalNotes').value = d.additionalNotes || '';
+    document.getElementById('priceBranding').checked = d.priceBranding || false;
+    document.getElementById('priceWeb').checked = d.priceWeb !== false;
+    document.getElementById('webHours').value = d.webHours || 50;
+    document.getElementById('priceHosting').checked = d.priceHosting !== false;
+    document.getElementById('priceSupport').checked = d.priceSupport !== false;
+    document.getElementById('supportTier').value = d.supportTier || 'basic';
+    document.getElementById('useCustomTotal').checked = d.useCustomTotal || false;
+    document.getElementById('customTotal').value = d.customTotal || '';
+    updatePricing();
+
+    if (d.execSummary) {
+      document.getElementById('execSummary').textContent = d.execSummary;
+      document.getElementById('projGoals').textContent = d.projGoals;
+      document.getElementById('scopeContent').textContent = d.scopeContent;
+      document.getElementById('timelineContent').textContent = d.timelineContent;
+      document.getElementById('pricingSummary').textContent = d.pricingSummary;
+      document.getElementById('nextStepsContent').textContent = d.nextStepsContent;
+      document.getElementById('similarProjects').innerHTML = d.similarProjects || '';
+      document.getElementById('generatedContent').style.display = 'block';
+      document.getElementById('regenerateBtn').style.display = 'inline-block';
+      document.getElementById('statusMsg').className = 'status success';
+      document.getElementById('statusMsg').innerHTML = '<span>✓</span> Draft loaded. Edit and copy to Proposify.';
+      goToStep(4);
+    } else {
+      goToStep(1);
+    }
+    toggleDrafts();
+  }
+
+  function deleteDraft(id, event) {
+    event.stopPropagation();
+    if (!confirm('Delete this draft?')) return;
+    const drafts = getDrafts().filter(d => d.id !== id);
+    localStorage.setItem('proposal-drafts', JSON.stringify(drafts));
+    renderDrafts();
+  }
+
+  function toggleDrafts() {
+    document.getElementById('draftsPanel').classList.toggle('open');
+    document.getElementById('draftsOverlay').classList.toggle('open');
+    if (document.getElementById('draftsPanel').classList.contains('open')) renderDrafts();
+  }
+
+  function renderDrafts() {
+    const drafts = getDrafts();
+    const container = document.getElementById('draftsList');
+    if (!drafts.length) {
+      container.innerHTML = '<p style="color:#666;font-size:14px;">No saved drafts yet. Click "Save Draft" to save your current work.</p>';
+      return;
+    }
+    container.innerHTML = drafts.map(d => {
+      const date = new Date(d.savedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      const hasContent = d.execSummary ? '✓ Generated' : 'Draft only';
+      return `<div class="draft-item" onclick="loadDraft(${d.id})">
+        <h3>${d.clientName}</h3>
+        <p>${date} · ${hasContent}</p>
+        <div class="draft-actions">
+          <button onclick="loadDraft(${d.id})">Load</button>
+          <button class="delete" onclick="deleteDraft(${d.id}, event)">Delete</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+</script>
+</body>
+</html>
