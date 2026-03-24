@@ -528,6 +528,37 @@
     window.scrollTo(0, 0);
   }
 
+  // Hub integration: read URL params to pre-fill from Client Hub
+  const urlParams = new URLSearchParams(window.location.search);
+  const hubClientId = urlParams.get('hubClient');
+  if (urlParams.get('clientName')) {
+    document.getElementById('clientName').value = urlParams.get('clientName');
+    document.getElementById('contactName').value = urlParams.get('contactName') || '';
+    document.getElementById('sector').value = urlParams.get('sector') || 'nonprofit';
+    document.getElementById('projectType').value = urlParams.get('projectType') || 'web-design';
+    document.getElementById('keywords').value = urlParams.get('keywords') || '';
+    // Auto-check branding
+    const pt = urlParams.get('projectType');
+    if (pt === 'branding-web' || pt === 'branding') {
+      document.getElementById('priceBranding').checked = true;
+      updatePricing();
+    }
+  }
+
+  async function saveToHub(proposalData) {
+    if (!hubClientId) return;
+    try {
+      await fetch(`http://localhost:3001/api/hub/save/${hubClientId}/proposal`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(proposalData),
+      });
+      console.log('[Hub] Proposal saved to client record');
+    } catch (e) {
+      console.log('[Hub] Could not save to hub (may not be running):', e.message);
+    }
+  }
+
   // File upload
   let uploadedFiles = [];
   function handleDrop(e) {
@@ -737,6 +768,17 @@
       status.innerHTML = '<span>✓</span> Content generated! Edit any section below, then copy to Proposify.';
       document.getElementById('generatedContent').style.display = 'block';
       document.getElementById('regenerateBtn').style.display = 'inline-block';
+
+      // Save to Client Hub if launched from there
+      saveToHub({
+        executiveSummary: data.sections.executiveSummary,
+        projectGoals: data.sections.projectGoals,
+        scope: data.sections.scope,
+        timeline: data.sections.timeline,
+        total: parseInt(document.getElementById('totalPrice').textContent.replace(/,/g, '')) || 0,
+        deposit: parseInt(document.getElementById('depositAmount').textContent.replace(/,/g, '')) || 0,
+        generatedAt: new Date().toISOString(),
+      });
     } catch (err) {
       status.className = 'status error';
       status.textContent = 'Error: ' + err.message;
