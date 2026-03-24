@@ -160,11 +160,10 @@ export function createApp(options = {}) {
 }
 
 // Start server if run directly
-const isMain = process.argv[1] && fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(import.meta.url));
-if (isMain) {
+if (!process.env.VITEST) {
   const PORT = process.env.PORT || 3000;
   const app = createApp();
-  app.listen(PORT, () => {
+  app.listen(PORT, '0.0.0.0', () => {
     console.log('='.repeat(50));
     console.log('Proposal Generator');
     console.log(`Open http://localhost:${PORT} in your browser`);
