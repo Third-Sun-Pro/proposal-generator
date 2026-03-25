@@ -327,34 +327,38 @@
       <div class="pricing-grid">
         <div class="pricing-item">
           <input type="checkbox" id="priceBranding" onchange="updatePricing()">
-          <label for="priceBranding">Brand & Identity Package<br><span style="font-size:12px;color:#666">30 hours</span></label>
-          <span class="price">$4,500</span>
+          <label for="priceBranding">Brand & Identity Package<br>
+            <span style="font-size:12px;color:#666">
+              <input type="number" class="hours-input" id="brandingHours" value="30" min="1" onchange="updatePricing()"> hours
+            </span>
+          </label>
+          <span class="price">$<input type="number" class="hours-input" id="brandingPrice" value="4500" min="0" style="width:85px" onchange="updatePricing()"></span>
         </div>
         <div class="pricing-item">
           <input type="checkbox" id="priceWeb" checked onchange="updatePricing()">
           <label for="priceWeb">Web Design & Development<br>
             <span style="font-size:12px;color:#666">
-              <input type="number" class="hours-input" id="webHours" value="50" min="50" max="100" onchange="updatePricing()"> hours
+              <input type="number" class="hours-input" id="webHours" value="50" min="1" onchange="document.getElementById('webPrice').value = this.value * 150; updatePricing()"> hours
             </span>
           </label>
-          <span class="price" id="webPrice">$7,500</span>
+          <span class="price">$<input type="number" class="hours-input" id="webPrice" value="7500" min="0" style="width:85px" onchange="updatePricing()"></span>
         </div>
         <div class="pricing-item">
           <input type="checkbox" id="priceHosting" checked onchange="updatePricing()">
           <label for="priceHosting">Annual Hosting<br><span style="font-size:12px;color:#666">managed hosting</span></label>
-          <span class="price">$450</span>
+          <span class="price">$<input type="number" class="hours-input" id="hostingPrice" value="450" min="0" style="width:85px" onchange="updatePricing()"></span>
         </div>
         <div class="pricing-item">
           <input type="checkbox" id="priceSupport" checked onchange="updatePricing()">
           <label for="priceSupport">Annual Support<br>
             <span style="font-size:12px;color:#666">
-              <select id="supportTier" onchange="updatePricing()" style="width:auto;display:inline;padding:4px 8px;">
-                <option value="basic">Basic — $1,200</option>
-                <option value="premium">Premium — $1,500</option>
+              <select id="supportTier" onchange="updateSupportPrice()" style="width:auto;display:inline;padding:4px 8px;">
+                <option value="basic">Basic</option>
+                <option value="premium">Premium</option>
               </select>
             </span>
           </label>
-          <span class="price" id="supportPrice">$1,200</span>
+          <span class="price">$<input type="number" class="hours-input" id="supportPrice" value="1200" min="0" style="width:85px" onchange="updatePricing()"></span>
         </div>
       </div>
 
@@ -694,29 +698,33 @@
   // Pricing
   function updatePricing() {
     const branding = document.getElementById('priceBranding').checked;
+    const brandingPrice = parseInt(document.getElementById('brandingPrice').value) || 0;
     const web = document.getElementById('priceWeb').checked;
-    const hours = parseInt(document.getElementById('webHours').value) || 50;
+    const webPrice = parseInt(document.getElementById('webPrice').value) || 0;
     const hosting = document.getElementById('priceHosting').checked;
+    const hostingPrice = parseInt(document.getElementById('hostingPrice').value) || 0;
     const support = document.getElementById('priceSupport').checked;
-    const tier = document.getElementById('supportTier').value;
+    const supportPrice = parseInt(document.getElementById('supportPrice').value) || 0;
     const useCustom = document.getElementById('useCustomTotal').checked;
     const customVal = parseInt(document.getElementById('customTotal').value) || 0;
 
-    const combo = branding && web;
     let total = 0;
-    if (branding) total += combo ? 4000 : 4500;
-    if (web) { total += hours * 150; document.getElementById('webPrice').textContent = '$' + (hours * 150).toLocaleString(); }
-    if (hosting) total += 450;
-    if (support) {
-      const sp = tier === 'premium' ? 1500 : 1200;
-      total += sp;
-      document.getElementById('supportPrice').textContent = '$' + sp.toLocaleString();
-    }
+    if (branding) total += brandingPrice;
+    if (web) total += webPrice;
+    if (hosting) total += hostingPrice;
+    if (support) total += supportPrice;
     if (useCustom && customVal > 0) total = customVal;
 
     document.getElementById('totalPrice').textContent = total.toLocaleString();
     document.getElementById('depositAmount').textContent = (total * 0.5).toLocaleString();
   }
+
+  function updateSupportPrice() {
+    const tier = document.getElementById('supportTier').value;
+    document.getElementById('supportPrice').value = tier === 'premium' ? 1500 : 1200;
+    updatePricing();
+  }
+
   updatePricing();
 
   document.getElementById('projectType').addEventListener('change', function() {
@@ -795,22 +803,26 @@
 
   function buildPricingText() {
     const branding = document.getElementById('priceBranding').checked;
+    const brandingHours = parseInt(document.getElementById('brandingHours').value) || 30;
+    const brandingPrice = parseInt(document.getElementById('brandingPrice').value) || 0;
     const web = document.getElementById('priceWeb').checked;
-    const hours = parseInt(document.getElementById('webHours').value) || 50;
+    const webHours = parseInt(document.getElementById('webHours').value) || 50;
+    const webPrice = parseInt(document.getElementById('webPrice').value) || 0;
     const hosting = document.getElementById('priceHosting').checked;
+    const hostingPrice = parseInt(document.getElementById('hostingPrice').value) || 0;
     const support = document.getElementById('priceSupport').checked;
     const tier = document.getElementById('supportTier').value;
+    const supportPrice = parseInt(document.getElementById('supportPrice').value) || 0;
     const total = document.getElementById('totalPrice').textContent;
     const deposit = document.getElementById('depositAmount').textContent;
     const clientName = document.getElementById('clientName').value || 'Client';
-    const combo = branding && web;
 
     let lines = [`Third Sun Productions estimates that the cost for producing the deliverables outlined in this proposal will be $${total}.`];
     lines.push('');
-    if (branding) lines.push(`• Brand & Identity Package: $${combo ? '4,000' : '4,500'}`);
-    if (web) lines.push(`• Web Design & Development (${hours} hours): $${(hours * 150).toLocaleString()}`);
-    if (hosting) lines.push('• Annual Hosting: $450');
-    if (support) lines.push(`• Annual Support Agreement (${tier}): $${tier === 'premium' ? '1,500' : '1,200'}`);
+    if (branding) lines.push(`• Brand & Identity Package (${brandingHours} hours): $${brandingPrice.toLocaleString()}`);
+    if (web) lines.push(`• Web Design & Development (${webHours} hours): $${webPrice.toLocaleString()}`);
+    if (hosting) lines.push(`• Annual Hosting: $${hostingPrice.toLocaleString()}`);
+    if (support) lines.push(`• Annual Support Agreement (${tier}): $${supportPrice.toLocaleString()}`);
     lines.push('');
     lines.push(`Payment to Third Sun Productions shall be made by ${clientName} as follows:`);
     lines.push(`• A deposit of 50% ($${deposit}) is due upon signing this Agreement before work begins.`);
@@ -878,11 +890,16 @@
       pastedNotes: document.getElementById('pastedNotes').value,
       additionalNotes: document.getElementById('additionalNotes').value,
       priceBranding: document.getElementById('priceBranding').checked,
+      brandingHours: document.getElementById('brandingHours').value,
+      brandingPrice: document.getElementById('brandingPrice').value,
       priceWeb: document.getElementById('priceWeb').checked,
       webHours: document.getElementById('webHours').value,
+      webPrice: document.getElementById('webPrice').value,
       priceHosting: document.getElementById('priceHosting').checked,
+      hostingPrice: document.getElementById('hostingPrice').value,
       priceSupport: document.getElementById('priceSupport').checked,
       supportTier: document.getElementById('supportTier').value,
+      supportPrice: document.getElementById('supportPrice').value,
       useCustomTotal: document.getElementById('useCustomTotal').checked,
       customTotal: document.getElementById('customTotal').value,
       execSummary: document.getElementById('execSummary').innerText,
@@ -921,11 +938,16 @@
     document.getElementById('pastedNotes').value = d.pastedNotes || '';
     document.getElementById('additionalNotes').value = d.additionalNotes || '';
     document.getElementById('priceBranding').checked = d.priceBranding || false;
+    document.getElementById('brandingHours').value = d.brandingHours || 30;
+    document.getElementById('brandingPrice').value = d.brandingPrice || 4500;
     document.getElementById('priceWeb').checked = d.priceWeb !== false;
     document.getElementById('webHours').value = d.webHours || 50;
+    document.getElementById('webPrice').value = d.webPrice || 7500;
     document.getElementById('priceHosting').checked = d.priceHosting !== false;
+    document.getElementById('hostingPrice').value = d.hostingPrice || 450;
     document.getElementById('priceSupport').checked = d.priceSupport !== false;
     document.getElementById('supportTier').value = d.supportTier || 'basic';
+    document.getElementById('supportPrice').value = d.supportPrice || 1200;
     document.getElementById('useCustomTotal').checked = d.useCustomTotal || false;
     document.getElementById('customTotal').value = d.customTotal || '';
     updatePricing();
