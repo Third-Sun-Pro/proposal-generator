@@ -118,7 +118,7 @@ export function createApp(options = {}) {
       if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
 
       const anthropicClient = new Anthropic({ apiKey });
-      const { clientName, sector, notes } = req.body;
+      const { clientName, contactName, sector, projectType, keywords, notes } = req.body;
 
       // Read uploaded files
       let transcript = req.body.transcript || '';
@@ -140,7 +140,7 @@ export function createApp(options = {}) {
         return res.status(400).json({ error: 'Please provide a transcript, notes, or upload files' });
       }
 
-      const generated = await generateProposal(clientName, sector, transcript, notes, anthropicClient);
+      const generated = await generateProposal(clientName, sector, transcript, notes, anthropicClient, { contactName, projectType, keywords });
       const sections = formatProposalSections(generated);
       const similar = findSimilarProjects(sector, clientName);
 

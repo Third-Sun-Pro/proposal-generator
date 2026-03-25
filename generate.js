@@ -176,7 +176,8 @@ ${content.slice(0, 8000)}`;
 /**
  * Generate proposal content from transcript/notes using Claude.
  */
-export async function generateProposal(clientName, sector, transcript, notes, anthropicClient) {
+export async function generateProposal(clientName, sector, transcript, notes, anthropicClient, extras = {}) {
+  const { contactName, projectType, keywords } = extras;
   const prompt = `You are writing a web design/branding proposal for Third Sun Productions, a Salt Lake City web design agency specializing in nonprofits and small businesses. They use Joomla CMS for all client sites.
 
 TONE AND STYLE RULES — THIS IS CRITICAL:
@@ -191,7 +192,10 @@ TONE AND STYLE RULES — THIS IS CRITICAL:
 Generate proposal content for a new client based on the following input.
 
 CLIENT: ${clientName}
+${contactName ? `CONTACT: ${contactName}` : ''}
 SECTOR: ${sector}
+${projectType ? `PROJECT TYPE: ${projectType}` : ''}
+${keywords ? `KEYWORDS/FOCUS: ${keywords}` : ''}
 
 ${transcript ? `ZOOM TRANSCRIPT / MEETING NOTES:\n${transcript}\n` : ''}
 ${notes ? `ADDITIONAL NOTES:\n${notes}\n` : ''}

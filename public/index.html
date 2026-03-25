@@ -746,7 +746,10 @@
 
     const formData = new FormData();
     formData.append('clientName', document.getElementById('clientName').value);
+    formData.append('contactName', document.getElementById('contactName').value);
     formData.append('sector', document.getElementById('sector').value);
+    formData.append('projectType', document.getElementById('projectType').value);
+    formData.append('keywords', document.getElementById('keywords').value);
     formData.append('transcript', document.getElementById('pastedNotes').value);
     formData.append('notes', document.getElementById('additionalNotes').value);
     for (const f of uploadedFiles) formData.append('files', f);
@@ -909,12 +912,14 @@
       pricingSummary: document.getElementById('pricingSummary').innerText,
       nextStepsContent: document.getElementById('nextStepsContent').innerText,
       similarProjects: document.getElementById('similarProjects').innerHTML,
+      selectedProjectNames: [...selectedProjects],
       savedAt: new Date().toISOString(),
     };
 
-    // Update existing or add new
-    const existing = drafts.findIndex(d => d.clientName === clientName);
-    if (existing >= 0) drafts[existing] = draft;
+    // Update existing or add new (match on client + project type to allow multiple proposals per client)
+    const projectType = document.getElementById('projectType').value;
+    const existing = drafts.findIndex(d => d.clientName === clientName && d.projectType === projectType);
+    if (existing >= 0) { draft.id = drafts[existing].id; drafts[existing] = draft; }
     else drafts.unshift(draft);
 
     localStorage.setItem('proposal-drafts', JSON.stringify(drafts));
@@ -951,6 +956,11 @@
     document.getElementById('useCustomTotal').checked = d.useCustomTotal || false;
     document.getElementById('customTotal').value = d.customTotal || '';
     updatePricing();
+
+    if (d.selectedProjectNames?.length) {
+      selectedProjects = new Set(d.selectedProjectNames);
+      renderProjectPicker();
+    }
 
     if (d.execSummary) {
       document.getElementById('execSummary').textContent = d.execSummary;
