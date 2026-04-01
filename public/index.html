@@ -501,6 +501,11 @@
 </div>
 
 <script>
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
   // Auth
   async function checkAuth() {
     const res = await fetch('/check-auth');
@@ -581,7 +586,7 @@
   function renderFileList() {
     const ul = document.getElementById('fileList');
     ul.innerHTML = uploadedFiles.map((f, i) =>
-      `<li>${f.name} <span style="color:#999;font-size:12px">(${(f.size/1024).toFixed(0)} KB)</span> <button onclick="removeFile(${i})">✕</button></li>`
+      `<li>${escapeHtml(f.name)} <span style="color:#999;font-size:12px">(${(f.size/1024).toFixed(0)} KB)</span> <button onclick="removeFile(${i})">✕</button></li>`
     ).join('');
   }
 
@@ -623,7 +628,7 @@
 
       const status = document.getElementById('extractStatus');
       status.className = 'status success';
-      status.innerHTML = '<span>✓</span> Client info extracted — review and adjust below.' + (data.notes ? ' <em>' + data.notes + '</em>' : '');
+      status.innerHTML = '<span>✓</span> Client info extracted — review and adjust below.' + (data.notes ? ' <em>' + escapeHtml(data.notes) + '</em>' : '');
       goToStep(2);
     } catch (err) {
       alert('Error extracting: ' + err.message + '. You can fill in the fields manually.');
@@ -1006,7 +1011,7 @@
       const date = new Date(d.savedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
       const hasContent = d.execSummary ? '✓ Generated' : 'Draft only';
       return `<div class="draft-item" onclick="loadDraft(${d.id})">
-        <h3>${d.clientName}</h3>
+        <h3>${escapeHtml(d.clientName)}</h3>
         <p>${date} · ${hasContent}</p>
         <div class="draft-actions">
           <button onclick="loadDraft(${d.id})">Load</button>

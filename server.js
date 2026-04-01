@@ -12,8 +12,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const upload = multer({ dest: path.join(__dirname, 'uploads/'), limits: { fileSize: 20 * 1024 * 1024 } });
 const portfolio = JSON.parse(fs.readFileSync(path.join(__dirname, 'portfolio.json'), 'utf-8'));
 
-const APP_PASSWORD = process.env.APP_PASSWORD || 'thirdsun';
-const SECRET = process.env.SESSION_SECRET || 'proposal-gen-dev-secret';
+const APP_PASSWORD = process.env.APP_PASSWORD;
+const SECRET = process.env.SESSION_SECRET;
 
 function signToken(data) {
   const payload = Buffer.from(JSON.stringify(data)).toString('base64');
@@ -25,7 +25,9 @@ function verifyToken(token) {
   if (!token) return null;
   const [payload, sig] = token.split('.');
   const expected = crypto.createHmac('sha256', SECRET).update(payload).digest('hex');
-  if (sig !== expected) return null;
+  const sigBuf = Buffer.from(sig, 'hex');
+  const expectedBuf = Buffer.from(expected, 'hex');
+  if (sigBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(sigBuf, expectedBuf)) return null;
   const data = JSON.parse(Buffer.from(payload, 'base64').toString());
   if (Date.now() - data.ts > 24 * 60 * 60 * 1000) return null;
   return data;
@@ -49,7 +51,8 @@ export function createApp(options = {}) {
   app.post('/login', (req, res) => {
     if (req.body.password !== APP_PASSWORD) return res.status(401).json({ error: 'Wrong password' });
     const token = signToken({ ts: Date.now() });
-    res.setHeader('Set-Cookie', `auth=${token}; HttpOnly; Path=/; SameSite=Strict; Max-Age=86400`);
+    const secure = process.env.NODE_ENV === 'production' ? ' Secure;' : '';
+    res.setHeader('Set-Cookie', `auth=${token}; HttpOnly;${secure} Path=/; SameSite=Strict; Max-Age=86400`);
     res.json({ success: true });
   });
 
@@ -95,7 +98,6 @@ export function createApp(options = {}) {
           } else {
             content += '\n\n' + fs.readFileSync(file.path, 'utf-8');
           }
-          fs.unlinkSync(file.path);
         }
       }
 
@@ -108,6 +110,10 @@ export function createApp(options = {}) {
     } catch (err) {
       console.error('[Extract Error]', err.message);
       res.status(500).json({ error: err.message });
+    } finally {
+      for (const file of req.files || []) {
+        try { fs.unlinkSync(file.path); } catch {}
+      }
     }
   });
 
@@ -132,7 +138,6 @@ export function createApp(options = {}) {
           } else {
             transcript += '\n\n' + fs.readFileSync(file.path, 'utf-8');
           }
-          fs.unlinkSync(file.path);
         }
       }
 
@@ -148,6 +153,10 @@ export function createApp(options = {}) {
     } catch (err) {
       console.error('[Generate Error]', err.message);
       res.status(500).json({ error: err.message });
+    } finally {
+      for (const file of req.files || []) {
+        try { fs.unlinkSync(file.path); } catch {}
+      }
     }
   });
 
@@ -161,6 +170,10 @@ export function createApp(options = {}) {
 
 // Start server if run directly
 if (!process.env.VITEST) {
+  if (!APP_PASSWORD || !SECRET) {
+    console.error('FATAL: APP_PASSWORD and SESSION_SECRET must be set in environment variables');
+    process.exit(1);
+  }
   const PORT = process.env.PORT || 3000;
   const app = createApp();
   app.listen(PORT, '0.0.0.0', () => {
