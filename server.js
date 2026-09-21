@@ -6,7 +6,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import Anthropic from '@anthropic-ai/sdk';
-import { findSimilarProjects, buildPricingBreakdown, generateProposal, formatProposalSections, extractClientInfo } from './generate.js';
+import { findSimilarProjects, buildPricingBreakdown, formatProposalSections, generateProposalStream, extractClientInfoStream } from './generate.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const upload = multer({ dest: path.join(__dirname, 'uploads/'), limits: { fileSize: 20 * 1024 * 1024 } });
@@ -37,6 +37,26 @@ function authMiddleware(req, res, next) {
   const token = req.headers.cookie?.match(/auth=([^;]+)/)?.[1];
   if (!verifyToken(token)) return res.status(401).json({ error: 'Unauthorized' });
   next();
+}
+
+// --- Server-Sent Events helpers -------------------------------------------
+// The AI routes stream their response so bytes keep flowing to the browser.
+// This defeats the production host's proxy idle-timeout, which was severing
+// long/large generations mid-flight (surfaced in the UI as "Failed to fetch").
+function beginSSE(res) {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no'); // ask nginx-style proxies not to buffer
+  if (typeof res.flushHeaders === 'function') res.flushHeaders();
+  // Heartbeat comment lines keep the connection alive even before the model
+  // starts emitting tokens (e.g. while a large PDF is parsed). Clients ignore
+  // lines that don't start with "data: ".
+  return setInterval(() => { try { res.write(': keepalive\n\n'); } catch {} }, 15000);
+}
+
+function sseSend(res, obj) {
+  res.write(`data: ${JSON.stringify(obj)}\n\n`);
 }
 
 export function createApp(options = {}) {
@@ -81,11 +101,13 @@ export function createApp(options = {}) {
 
   // Extract client info from uploaded content
   app.post('/extract-client-info', auth, upload.array('files', 10), async (req, res) => {
+    const heartbeat = beginSSE(res);
+    req.on('close', () => clearInterval(heartbeat));
     try {
       const apiKey = process.env.ANTHROPIC_API_KEY;
-      if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
+      if (!apiKey) return sseSend(res, { error: 'ANTHROPIC_API_KEY not configured' });
 
-      const anthropicClient = new Anthropic({ apiKey });
+      const anthropicClient = new Anthropic({ apiKey, maxRetries: 3 });
       let content = req.body.transcript || '';
 
       if (req.files?.length) {
@@ -102,28 +124,32 @@ export function createApp(options = {}) {
       }
 
       if (!content.trim()) {
-        return res.status(400).json({ error: 'No content to extract from' });
+        return sseSend(res, { error: 'No content to extract from' });
       }
 
-      const info = await extractClientInfo(content, anthropicClient);
-      res.json({ success: true, ...info });
+      const info = await extractClientInfoStream(content, anthropicClient, (delta) => sseSend(res, { text: delta }));
+      sseSend(res, { done: true, ...info });
     } catch (err) {
       console.error('[Extract Error]', err.message);
-      res.status(500).json({ error: err.message });
+      sseSend(res, { error: err.message });
     } finally {
+      clearInterval(heartbeat);
       for (const file of req.files || []) {
         try { fs.unlinkSync(file.path); } catch {}
       }
+      res.end();
     }
   });
 
   // Generate proposal from transcript/notes
   app.post('/generate', auth, upload.array('files', 10), async (req, res) => {
+    const heartbeat = beginSSE(res);
+    req.on('close', () => clearInterval(heartbeat));
     try {
       const apiKey = process.env.ANTHROPIC_API_KEY;
-      if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
+      if (!apiKey) return sseSend(res, { error: 'ANTHROPIC_API_KEY not configured' });
 
-      const anthropicClient = new Anthropic({ apiKey });
+      const anthropicClient = new Anthropic({ apiKey, maxRetries: 3 });
       const { clientName, contactName, sector, projectType, keywords, notes } = req.body;
 
       // Read uploaded files
@@ -142,21 +168,27 @@ export function createApp(options = {}) {
       }
 
       if (!transcript && !notes) {
-        return res.status(400).json({ error: 'Please provide a transcript, notes, or upload files' });
+        return sseSend(res, { error: 'Please provide a transcript, notes, or upload files' });
       }
 
-      const generated = await generateProposal(clientName, sector, transcript, notes, anthropicClient, { contactName, projectType, keywords });
+      const generated = await generateProposalStream(
+        clientName, sector, transcript, notes, anthropicClient,
+        { contactName, projectType, keywords },
+        (delta) => sseSend(res, { text: delta })
+      );
       const sections = formatProposalSections(generated);
       const similar = findSimilarProjects(sector, clientName);
 
-      res.json({ success: true, sections, similar, raw: generated });
+      sseSend(res, { done: true, sections, similar, raw: generated });
     } catch (err) {
       console.error('[Generate Error]', err.message);
-      res.status(500).json({ error: err.message });
+      sseSend(res, { error: err.message });
     } finally {
+      clearInterval(heartbeat);
       for (const file of req.files || []) {
         try { fs.unlinkSync(file.path); } catch {}
       }
+      res.end();
     }
   });
 

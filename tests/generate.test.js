@@ -1,5 +1,25 @@
 import { describe, it, expect } from 'vitest';
-import { findSimilarProjects, buildPricingBreakdown, formatProposalSections } from '../generate.js';
+import { findSimilarProjects, buildPricingBreakdown, formatProposalSections, generateProposalStream, extractClientInfoStream } from '../generate.js';
+
+// Minimal fake Anthropic client whose messages.stream() emits the given text
+// as a single delta and returns it as the final message — enough to exercise
+// the streaming wiring (on('text') + finalMessage) and JSON parsing.
+function fakeStreamClient(fullText) {
+  return {
+    messages: {
+      stream() {
+        const handlers = {};
+        return {
+          on(event, cb) { handlers[event] = cb; return this; },
+          async finalMessage() {
+            if (handlers.text) handlers.text(fullText);
+            return { content: [{ text: fullText }], usage: {} };
+          },
+        };
+      },
+    },
+  };
+}
 
 describe('findSimilarProjects', () => {
   it('returns nonprofits when sector is nonprofit', () => {
@@ -152,5 +172,33 @@ describe('formatProposalSections', () => {
   it('includes next steps', () => {
     const sections = formatProposalSections(sampleGenerated);
     expect(sections.nextSteps).toContain('Sign the agreement');
+  });
+});
+
+describe('generateProposalStream', () => {
+  it('forwards deltas and returns parsed proposal JSON', async () => {
+    const proposal = { executiveSummary: 'A summary.', projectGoals: ['Goal one'], scope: [], timeline: '6-12 weeks', nextSteps: 'Sign to begin.' };
+    const client = fakeStreamClient(JSON.stringify(proposal));
+    const chunks = [];
+    const result = await generateProposalStream('Acme', 'nonprofit', 'transcript', '', client, {}, (d) => chunks.push(d));
+    expect(result.executiveSummary).toBe('A summary.');
+    expect(result.timeline).toBe('6-12 weeks');
+    expect(chunks.join('')).toContain('executiveSummary');
+  });
+
+  it('strips markdown code fences from streamed JSON', async () => {
+    const client = fakeStreamClient('```json\n{"timeline":"2-4 months","projectGoals":[],"scope":[],"executiveSummary":"","nextSteps":""}\n```');
+    const result = await generateProposalStream('Acme', 'nonprofit', 't', '', client, {});
+    expect(result.timeline).toBe('2-4 months');
+  });
+});
+
+describe('extractClientInfoStream', () => {
+  it('returns parsed client info', async () => {
+    const info = { clientName: 'Acme', contactName: 'Jo', sector: 'nonprofit', keywords: 'arts', projectType: 'redesign', notes: 'needs a new site' };
+    const client = fakeStreamClient(JSON.stringify(info));
+    const result = await extractClientInfoStream('some meeting notes', client);
+    expect(result.clientName).toBe('Acme');
+    expect(result.sector).toBe('nonprofit');
   });
 });

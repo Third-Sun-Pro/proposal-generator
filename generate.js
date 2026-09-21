@@ -12,6 +12,9 @@ function parseJSON(text) {
   return JSON.parse(cleaned);
 }
 
+// Model used for all Claude calls. Overridable via env for easy upgrades.
+const MODEL = process.env.CLAUDE_MODEL || 'claude-haiku-4-5-20251001';
+
 const RATES = {
   branding: 4500,       // 30 hours
   brandingCombo: 4000,  // discount when bundled with web
@@ -143,11 +146,8 @@ export function formatProposalSections(generated) {
   };
 }
 
-/**
- * Extract client info from uploaded content using Claude.
- */
-export async function extractClientInfo(content, anthropicClient) {
-  const prompt = `Extract client information from the following meeting transcript, notes, or documents. Return ONLY valid JSON with these fields:
+function buildExtractPrompt(content) {
+  return `Extract client information from the following meeting transcript, notes, or documents. Return ONLY valid JSON with these fields:
 
 {
   "clientName": "organization/company name",
@@ -162,11 +162,16 @@ If a field cannot be determined, use an empty string. Make your best guess for s
 
 CONTENT:
 ${content.slice(0, 8000)}`;
+}
 
+/**
+ * Extract client info from uploaded content using Claude.
+ */
+export async function extractClientInfo(content, anthropicClient) {
   const response = await anthropicClient.messages.create({
-    model: 'claude-haiku-4-5-20251001',
+    model: MODEL,
     max_tokens: 500,
-    messages: [{ role: 'user', content: prompt }],
+    messages: [{ role: 'user', content: buildExtractPrompt(content) }],
   });
 
   const text = response.content[0].text;
@@ -174,11 +179,27 @@ ${content.slice(0, 8000)}`;
 }
 
 /**
+ * Streaming version of extractClientInfo. Forwards token deltas to onChunk so
+ * the HTTP connection keeps sending bytes (defeats proxy idle-timeouts on the
+ * production host). Returns the same parsed object as extractClientInfo.
+ */
+export async function extractClientInfoStream(content, anthropicClient, onChunk = () => {}) {
+  const stream = anthropicClient.messages.stream({
+    model: MODEL,
+    max_tokens: 500,
+    messages: [{ role: 'user', content: buildExtractPrompt(content) }],
+  });
+  stream.on('text', (delta) => onChunk(delta));
+  const finalMessage = await stream.finalMessage();
+  return parseJSON(finalMessage.content[0].text);
+}
+
+/**
  * Generate proposal content from transcript/notes using Claude.
  */
-export async function generateProposal(clientName, sector, transcript, notes, anthropicClient, extras = {}) {
+function buildProposalPrompt(clientName, sector, transcript, notes, extras = {}) {
   const { contactName, projectType, keywords } = extras;
-  const prompt = `You are writing a web design/branding proposal for Third Sun Productions, a Salt Lake City web design agency specializing in nonprofits and small businesses. They use Joomla CMS for all client sites.
+  return `You are writing a web design/branding proposal for Third Sun Productions, a Salt Lake City web design agency specializing in nonprofits and small businesses. They use Joomla CMS for all client sites.
 
 TONE AND STYLE RULES — THIS IS CRITICAL:
 - Write in THIRD PERSON only. Never use "you" or "your." Always refer to the client by their organization name (e.g. "${clientName}") or "the client."
@@ -241,13 +262,31 @@ Then include ONLY the relevant sections from this list, using these EXACT titles
 
 Only include sections that are relevant based on the input. Tailor bullet points to the specific client.
 Return ONLY valid JSON, no markdown formatting.`;
+}
 
+export async function generateProposal(clientName, sector, transcript, notes, anthropicClient, extras = {}) {
   const response = await anthropicClient.messages.create({
-    model: 'claude-haiku-4-5-20251001',
+    model: MODEL,
     max_tokens: 2000,
-    messages: [{ role: 'user', content: prompt }],
+    messages: [{ role: 'user', content: buildProposalPrompt(clientName, sector, transcript, notes, extras) }],
   });
 
   const text = response.content[0].text;
   return parseJSON(text);
+}
+
+/**
+ * Streaming version of generateProposal. Forwards token deltas to onChunk to
+ * keep the connection alive over SSE (the fix for large transcripts getting
+ * cut off by the production host's idle-timeout). Returns the parsed proposal.
+ */
+export async function generateProposalStream(clientName, sector, transcript, notes, anthropicClient, extras = {}, onChunk = () => {}) {
+  const stream = anthropicClient.messages.stream({
+    model: MODEL,
+    max_tokens: 2000,
+    messages: [{ role: 'user', content: buildProposalPrompt(clientName, sector, transcript, notes, extras) }],
+  });
+  stream.on('text', (delta) => onChunk(delta));
+  const finalMessage = await stream.finalMessage();
+  return parseJSON(finalMessage.content[0].text);
 }
