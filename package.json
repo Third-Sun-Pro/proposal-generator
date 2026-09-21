@@ -13,11 +13,11 @@
     "@anthropic-ai/sdk": "^0.39.0",
     "dotenv": "^17.3.1",
     "express": "^5.1.0",
-    "multer": "^1.4.5-lts.2",
+    "multer": "^2.4.0",
     "pdf-parse": "^1.1.1"
   },
   "devDependencies": {
     "supertest": "^7.1.0",
-    "vitest": "^3.1.1"
+    "vitest": "^5.0.1"
   }
 }
